@@ -38,12 +38,12 @@ x2 = tf.placeholder('float', [None, 5625])
 y = tf.placeholder('float')
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/iceberg_detector.ckpt')
+modelFn = os.path.normpath('models/tensorflow/iceberg_detector_dual_band_concat.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector.log')
+logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector_dual_band_concat.log')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
@@ -195,7 +195,7 @@ def train_network(x1, x2):
 
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainData) / batchSize)):
+                for j in range(int(len(trainBand1) / batchSize)):
                     epoch_x1 = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_x2 = trainBand2[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
@@ -239,7 +239,7 @@ def train_network(x1, x2):
             saver.restore(sess, modelFn)
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainData) / batchSize)):
+                for j in range(int(len(trainBand1) / batchSize)):
                     epoch_x1 = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_x2 = trainBand2[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
@@ -369,5 +369,5 @@ except:
     exit(1)
 
 ###### RUN THE SESSION ########
-print("Starting the TensorFlow session...\n\n")
+print("\n\nStarting the TensorFlow session...\n\n")
 train_network(x1, x2)
