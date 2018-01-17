@@ -41,6 +41,11 @@ modelFn = os.path.normpath('models/tensorflow/iceberg_detector_single_band_netwo
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
+####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
+logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector_single_band_network.log')
+if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
+    os.makedirs('models/tensorflow/logs')
+
 ######## UTILITY FUNCTIONS ########
 def splitData(data, trainingSplit=0.7):
     training, test = np.split(data, [int(data.shape[0] * trainingSplit)])
@@ -157,6 +162,10 @@ def train_network(x):
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+
+        ####### INIT LOGGING TO TENSORBOARD #######
+        writer = tf.summary.FileWriter(logFn)
+        writer.add_graph(sess.graph)
 
         print("\n\n")
 

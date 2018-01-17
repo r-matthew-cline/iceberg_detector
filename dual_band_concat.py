@@ -42,6 +42,11 @@ modelFn = os.path.normpath('models/tensorflow/iceberg_detector.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
+####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
+logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector.log')
+if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
+    os.makedirs('models/tensorflow/logs')
+
 ######## UTILITY FUNCTIONS ########
 def splitData(data, trainingSplit=0.7):
     training, test = np.split(data, [int(data.shape[0] * trainingSplit)])
@@ -180,6 +185,8 @@ def train_network(x1, x2):
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+        writer = tf.summary.FileWriter(logFn)
+        writer.add_graph(sess.graph)
 
         print("\n\n")
 
