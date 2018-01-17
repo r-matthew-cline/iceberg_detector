@@ -25,9 +25,9 @@ import tensorflow as tf
 
 
 ####### HYPER PARAMS ########
-learningRate = 0.001
+learningRate = 0.0001
 n_classes = 2
-keepRate = 0.7
+keepRate = 0.8
 batchSize = 10
 numEpochs = 10000
 displayStep = 5
@@ -171,7 +171,7 @@ def train_network(x):
 
         if sys.argv[1] == 'train':
             print("Beginning the training of the model...\n\n")
-
+            keepRate = 0.8
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
                 for j in range(int(len(trainBand1) / batchSize)):
@@ -189,6 +189,7 @@ def train_network(x):
             print("Model saved in file: %s" % save_path)
 
             tempEval = []
+            keepRate = 1.0
             for j in range(int(len(testBand1) / batchSize)+1):
                 batch_x = testBand1[j*batchSize:(j+1)*batchSize]
                 predOut = predictions.eval(feed_dict={x: batch_x})
@@ -214,6 +215,7 @@ def train_network(x):
         elif sys.argv[1] == 'continue':
             print("Loading the model from storage to continue training...\n\n")
             saver.restore(sess, modelFn)
+            keepRate = 0.8
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
                 for j in range(int(len(trainBand1) / batchSize)):
@@ -230,6 +232,7 @@ def train_network(x):
             save_path = saver.save(sess, modelFn)
             print("Model saved in file: %s" % save_path)
 
+            keepRate = 1.0
             tempEval = []
             for j in range(int(len(testBand1) / batchSize)+1):
                 batch_x = testBand1[j*batchSize:(j+1)*batchSize]
@@ -256,6 +259,7 @@ def train_network(x):
         else:
             print("Loading the model from storage...\n\n")
             saver.restore(sess, modelFn)
+            keepRate = 1.0
             tempEval = []
             for j in range(int(len(testBand1) / batchSize)+1):
                 batch_x = testBand1[j*batchSize:(j+1)*batchSize]
@@ -344,5 +348,5 @@ except:
 
 
 ###### RUN THE SESSION ########
-print("Starting the TensorFlow session...\n\n")
+print("\n\nStarting the TensorFlow session...\n\n")
 train_network(x)

@@ -62,10 +62,12 @@ def reorgImgs(data):
 ####### READ IN THE DATA #######
 print("\n\nReading the data from the file train.json ...\n\n")
 tempData = pd.read_json('train.json')
+compData = pd.read_json('test.json')
 
 ####### SET UP ONE HOT ENCODING #######
 print("Encoding the labels with one hot encoding... \n\n")
 tempData = encode_oneHot(tempData)
+compData = encode_oneHot(compData)
 
 ####### SHUFFLE THE DATA ########
 print("Shuffling the data...\n\n")
@@ -83,6 +85,9 @@ trainBand1 = np.array(trainData.iloc[:,0])
 trainBand2 = np.array(trainData.iloc[:,1])
 testBand1 = np.array(testData.iloc[:,0])
 testBand2 = np.array(testData.iloc[:,1])
+compId = np.array(compData['id'])
+compBand1 = np.array(compData.iloc[:,0])
+compBand2 = np.array(compData.iloc[:1])
 
 ####### CHANGE THE DATA STRUCTURE TO PLAY NICE WITH TF #######
 print("Changing the data structure for TensorFlow...\n\n")
@@ -100,12 +105,21 @@ for i in range(len(testBand1)):
 testBand1 = reorgImgs(testBand1)
 testBand2 = reorgImgs(testBand2)
 
+for i in range(len(compBand1)):
+    compBand1[i] = np.array(compBand1[i])
+    compBand2[i] = np.array(compBand2[i])
+
+compBand1 = reorgImgs(compBand1)
+compBand2 = reorgImgs(compBand2)
+
 ####### STANDARDIZE THE IMAGE DATA ####### 
 print("Standardizing the features...\n\n")
 trainBand1 = standardizeFeatures(trainBand1)
 trainBand2 = standardizeFeatures(trainBand2)
 testBand1 = standardizeFeatures(testBand1)
 testBand2 = standardizeFeatures(testBand2)
+compBand1 = standardizeFeatures(compBand1)
+compBand2 = standardizeFeatures(compBand2)
 
 ####### SCALING THE IMAGE DATA #######
 print("Scaling the features...\n\n")
@@ -113,6 +127,8 @@ trainBand1 = scaleFeatures(trainBand1)
 trainBand2 = scaleFeatures(trainBand2)
 testBand1 = scaleFeatures(testBand1)
 testBand2 = scaleFeatures(testBand2)
+compBand1 = scaleFeatures(compBand1)
+compBand2 = scaleFeatures(compBand2)
 
 ######## DUMP ALL OF THE OBJECTS TO PICKLE FILES #######
 print("Dumping all of the objects to Pickle files for later use.")
@@ -122,3 +138,6 @@ pickle.dump(testLabels, open(dataDirectory + "/testLabels.p", "wb"))
 pickle.dump(trainBand1, open(dataDirectory + "/trainBand1.p", "wb"))
 pickle.dump(trainBand2, open(dataDirectory + "/trainBand2.p", "wb"))
 pickle.dump(trainLabels, open(dataDirectory + "/trainLabels.p", "wb"))
+pickle.dump(compBand1, open(dataDirectory + "/compBand1.p", "wb"))
+pickle.dump(compBand2, open(dataDirectory + "/compBand2.p", "wb"))
+pickle.dump(compId, open(dataDirectory + "/compId.p", "wb"))
