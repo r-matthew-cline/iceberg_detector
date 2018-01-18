@@ -184,6 +184,7 @@ def train_network(x1, x2):
 
     with tf.name_scope('Cost'):
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=predictions))
+        tf.summary.scalar('Cross Entropy', cost)
         # with tf.name_scope('Regularization'):
         #     regularizer = tf.nn.l2_loss(weights['W_conv1']) + tf.nn.l2_loss(weights['W_conv2']) + tf.nn.l2_loss(weights['W_conv3']) + tf.nn.l2_loss(weights['W_conv4']) + tf.nn.l2_loss(weights['W_conv5']) + tf.nn.l2_loss(weights['W_conv6']) + tf.nn.l2_loss(weights['W_conv1_combo']) + tf.nn.l2_loss(weights['W_conv2_combo']) + tf.nn.l2_loss(weights['W_fc']) + tf.nn.l2_loss(weights['W_out'])
         #     cost = tf.reduce_mean(cost + beta * regularizer)
@@ -217,9 +218,7 @@ def train_network(x1, x2):
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
                     _, c = sess.run([optimizer, cost], feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
                     epochLoss += c
-                    tf.summary.scalar('Cost', epochLoss)
                 if epoch % displayStep == 0 or epoch == 1:
-                    merged = tf.summary.merge_all()
                     summary = sess.run(merged, feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
                     writer.add_summary(summary, epoch)
                     print("Epoch ", epoch, ' completed out of ', numEpochs, ' with loss: ', epochLoss)
