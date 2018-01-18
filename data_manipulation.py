@@ -62,12 +62,12 @@ def reorgImgs(data):
 ####### READ IN THE DATA #######
 print("\n\nReading the data from the file train.json ...\n\n")
 tempData = pd.read_json('train.json')
+print("Reading the data from the file test.json...\n\n")
 compData = pd.read_json('test.json')
 
 ####### SET UP ONE HOT ENCODING #######
 print("Encoding the labels with one hot encoding... \n\n")
 tempData = encode_oneHot(tempData)
-compData = encode_oneHot(compData)
 
 ####### SHUFFLE THE DATA ########
 print("Shuffling the data...\n\n")
@@ -87,7 +87,7 @@ testBand1 = np.array(testData.iloc[:,0])
 testBand2 = np.array(testData.iloc[:,1])
 compId = np.array(compData['id'])
 compBand1 = np.array(compData.iloc[:,0])
-compBand2 = np.array(compData.iloc[:1])
+compBand2 = np.array(compData.iloc[:,1])
 
 ####### CHANGE THE DATA STRUCTURE TO PLAY NICE WITH TF #######
 print("Changing the data structure for TensorFlow...\n\n")

@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import sys
 import os
+import datetime
 import pickle
 
 import tensorflow as tf
@@ -32,70 +33,46 @@ batchSize = 10
 ####### TENSORFLOW PLACEHOLDERS #######
 x = tf.placeholder('float', [None, 5625])
 y = tf.placeholder('float')
+weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 1, 75], stddev=0.1)),
+               'W_conv2': tf.Variable(tf.truncated_normal([4, 4, 75, 100], stddev=0.1)),
+               'W_conv3': tf.Variable(tf.truncated_normal([4, 4, 100, 150], stddev=0.1)),
+               'W_conv4': tf.Variable(tf.truncated_normal([4, 4, 150, 100], stddev=0.1)),
+               'W_conv5': tf.Variable(tf.truncated_normal([4, 4, 100, 75], stddev=0.1)),
+               'W_conv6': tf.Variable(tf.truncated_normal([3, 3, 75, 50], stddev=0.1)),
+               'W_conv7': tf.Variable(tf.truncated_normal([3, 3, 50, 25], stddev=0.1)),
+               'W_conv8': tf.Variable(tf.truncated_normal([3, 3, 25, 10], stddev=0.1)),
+               'W_fc': tf.Variable(tf.truncated_normal([75 * 75 * 10, 1024], stddev=0.1)),
+               'W_out': tf.Variable(tf.truncated_normal([1024, n_classes], stddev=0.1))}
+
+biases = {'b_conv1': tf.Variable(tf.zeros([75])),
+              'b_conv2': tf.Variable(tf.zeros([100])),
+              'b_conv3': tf.Variable(tf.zeros([150])),
+              'b_conv4': tf.Variable(tf.zeros([100])),
+              'b_conv5': tf.Variable(tf.zeros([75])),
+              'b_conv6': tf.Variable(tf.zeros([50])),
+              'b_conv7': tf.Variable(tf.zeros([25])),
+              'b_conv8': tf.Variable(tf.zeros([10])),
+              'b_fc': tf.Variable(tf.zeros([1024])),
+              'b_out': tf.Variable(tf.zeros([n_classes]))}
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/iceberg_detector_single_band_network.ckpt')
+modelFn = os.path.normpath('models/tensorflow/test_single_band_network.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector_single_band_network.log')
+logFn = os.path.normpath('models/tensorflow/logs/test_single_band_network.log')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
+####### SET UP OUTPUT DIRECTORY #######
+now = datetime.datetime.now()
+name = str(now.year) + str(now.month) + str(now.day) + str(now.hour) + str(now.minute) + ".csv"
+outputFn = os.path.normpath('output/single_band/' + name)
+if not os.path.exists(os.path.normpath('output/single_band')):
+    os.makedirs('output/single_band')
+
 ######## UTILITY FUNCTIONS ########
-def splitData(data, trainingSplit=0.7):
-    training, test = np.split(data, [int(data.shape[0] * trainingSplit)])
-    return training, test
-
-
-def shuffleData(data):
-    data = data.reindex(np.random.permutation(data.index))
-    data = data.reset_index(drop=True)
-    return data
-
-
-def standardizeFeatures(data):
-    for i in range(data.shape[0]):
-        temp1 = np.array(data.iloc[i,0])
-        temp2 = np.array(data.iloc[i,1])
-        temp1 = (temp1 - np.mean(temp1)) / np.std(temp1)
-        temp2 = (temp2 - np.mean(temp2)) / np.std(temp2)
-        data.iloc[i,0] = temp1
-        data.iloc[i,1] = temp2
-    return data
-
-
-def scaleFeatures(data):
-    for i in range(data.shape[0]):
-        temp1 = np.array(data.iloc[i,0])
-        temp2 = np.array(data.iloc[i,1])
-        temp1 = (temp1 - np.min(temp1)) / (np.max(temp1) - np.min(temp1))
-        temp2 = (temp2 - np.min(temp2)) / (np.max(temp2) - np.min(temp2))
-        data.iloc[i,0] = temp1
-        data.iloc[i,1] = temp2
-    return data
-
-
-def encode_oneHot(data):
-    data['not_iceberg'] = np.nan
-    data['iceberg'] = np.nan
-    for i in range(data.shape[0]):
-        if data.iloc[i,4] == 1:
-            data.iloc[i,5] = 0
-            data.iloc[i,6] = 1
-        else:
-            data.iloc[i,5] = 1
-            data.iloc[i,6] = 0
-    return data
-
-def reorgImgs(data):
-    sample = data[0]
-    for i in range(1,len(data)):
-        sample = np.concatenate((sample, data[i]))
-    sample =  np.reshape(sample, (-1,5625))
-    return sample
-
 
 def conv2d(x, W, b):
     temp = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME') + b
@@ -103,28 +80,7 @@ def conv2d(x, W, b):
     temp = tf.nn.dropout(temp, keepRate)
     return temp
 
-def convolutional_neural_network(x):
-    weights = {'W_conv1': tf.Variable(tf.random_normal([3, 3, 1, 75])),
-               'W_conv2': tf.Variable(tf.random_normal([4, 4, 75, 100])),
-               'W_conv3': tf.Variable(tf.random_normal([4, 4, 100, 150])),
-               'W_conv4': tf.Variable(tf.random_normal([4, 4, 150, 100])),
-               'W_conv5': tf.Variable(tf.random_normal([4, 4, 100, 75])),
-               'W_conv6': tf.Variable(tf.random_normal([3, 3, 75, 50])),
-               'W_conv7': tf.Variable(tf.random_normal([3, 3, 50, 25])),
-               'W_conv8': tf.Variable(tf.random_normal([3, 3, 25, 10])),
-               'W_fc': tf.Variable(tf.random_normal([75 * 75 * 10, 1024])),
-               'W_out': tf.Variable(tf.random_normal([1024, n_classes]))}
-
-    biases = {'b_conv1': tf.Variable(tf.random_normal([75])),
-              'b_conv2': tf.Variable(tf.random_normal([100])),
-              'b_conv3': tf.Variable(tf.random_normal([150])),
-              'b_conv4': tf.Variable(tf.random_normal([100])),
-              'b_conv5': tf.Variable(tf.random_normal([75])),
-              'b_conv6': tf.Variable(tf.random_normal([50])),
-              'b_conv7': tf.Variable(tf.random_normal([25])),
-              'b_conv8': tf.Variable(tf.random_normal([10])),
-              'b_fc': tf.Variable(tf.random_normal([1024])),
-              'b_out': tf.Variable(tf.random_normal([n_classes]))}
+def convolutional_neural_network(x, weights, biases):
 
     x = tf.reshape(x, shape=[-1, 75, 75, 1])
 
@@ -150,7 +106,7 @@ def convolutional_neural_network(x):
 
 
 def train_network(x):
-    predictions = convolutional_neural_network(x)
+    predictions = convolutional_neural_network(x, weights, biases)
 
     saver = tf.train.Saver()
 
@@ -169,10 +125,17 @@ def train_network(x):
                 tempEval = predOut
             else:
                 tempEval = np.concatenate((tempEval, predOut))
-        df = pd.DataFrame([compId, tempEval[:,1]], columns=['id', 'is_iceberg'])
+        tempEval = tempEval[:,1]
+        d = {'id': compId, 'is_iceberg': tempEval}
+        df = pd.DataFrame(data=d)
+        pd.set_option('precision', 3)
+        pd.set_option('display.float_format', lambda x: '%.3f' % x)
         print(df)
+        print("\n\nPrinting the results to csv file...\n\n")
+        df.to_csv(outputFn, index=False)
 
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
+print("Reading in the test data from pickle files...\n\n")
 try:
     compId = pickle.load(open("data/pickle/compId.p", "rb"))
     compBand1 = pickle.load(open("data/pickle/compBand1.p", "rb"))
