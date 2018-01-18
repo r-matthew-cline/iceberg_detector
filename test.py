@@ -221,8 +221,6 @@ def train_network(x):
                     tempEval = np.concatenate((tempEval, predOut))
             predOut = np.argmax(tempEval, axis=1)
             tempLabels = np.argmax(testLabels, axis=1)
-            print("Predictions: ", predOut.shape, "\n\n")
-            print("Labels: ", tempLabels.shape, "\n\n")
             tn, fp, fn, tp = skm.confusion_matrix(tempLabels, predOut).ravel()
             print("\n\nConfusion Matrix:\n", skm.confusion_matrix(tempLabels, predOut), "\n\n")
             print("True Negative: ", tn)
