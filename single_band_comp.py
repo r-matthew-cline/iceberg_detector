@@ -134,6 +134,10 @@ def train_network(x):
         print("\n\nPrinting the results to csv file...\n\n")
         df.to_csv(outputFn, index=False)
 
+        plt.figure()
+        plt.hist(df['is_iceberg'])
+        plt.show()
+
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
 print("Reading in the test data from pickle files...\n\n")
 try:

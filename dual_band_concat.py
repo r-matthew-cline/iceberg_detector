@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import sys
 import os
+import datetime
 import pickle
 
 import tensorflow as tf
@@ -66,9 +67,11 @@ if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector_dual_band_concat.log')
-if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
-    os.makedirs('models/tensorflow/logs')
+now = datetime.datetime.now()
+runName = str(now.year) + str(now.month) + str(now.day) + "-" +str(now.hour) + str(now.minute)
+logFn = os.path.normpath('models/tensorflow/logs/iceberg_detector_dual_band_concat/' + runName)
+if not os.path.exists(os.path.normpath('models/tensorflow/logs/iceberg_detector_dual_band_concat')):
+    os.makedirs('models/tensorflow/logs/iceberg_detector_dual_band_concat')
 
 ######## UTILITY FUNCTIONS ########
 def variable_summaries(var):
@@ -181,11 +184,10 @@ def train_network(x1, x2):
 
     with tf.name_scope('Cost'):
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=predictions))
-        tf.summary.scalar('cost', cost)
-        with tf.name_scope('Regularization'):
-            regularizer = tf.nn.l2_loss(weights['W_conv1']) + tf.nn.l2_loss(weights['W_conv2']) + tf.nn.l2_loss(weights['W_conv3']) + tf.nn.l2_loss(weights['W_conv4']) + tf.nn.l2_loss(weights['W_conv5']) + tf.nn.l2_loss(weights['W_conv6']) + tf.nn.l2_loss(weights['W_conv1_combo']) + tf.nn.l2_loss(weights['W_conv2_combo']) + tf.nn.l2_loss(weights['W_fc']) + tf.nn.l2_loss(weights['W_out'])
-            cost = tf.reduce_mean(cost + beta * regularizer)
-            tf.summary.scalar('Reg_cost', cost)
+        # with tf.name_scope('Regularization'):
+        #     regularizer = tf.nn.l2_loss(weights['W_conv1']) + tf.nn.l2_loss(weights['W_conv2']) + tf.nn.l2_loss(weights['W_conv3']) + tf.nn.l2_loss(weights['W_conv4']) + tf.nn.l2_loss(weights['W_conv5']) + tf.nn.l2_loss(weights['W_conv6']) + tf.nn.l2_loss(weights['W_conv1_combo']) + tf.nn.l2_loss(weights['W_conv2_combo']) + tf.nn.l2_loss(weights['W_fc']) + tf.nn.l2_loss(weights['W_out'])
+        #     cost = tf.reduce_mean(cost + beta * regularizer)
+        #     tf.summary.scalar('Reg_cost', cost)
 
     with tf.name_scope('train'):
         optimizer = tf.train.AdamOptimizer(learning_rate=learningRate).minimize(cost)
@@ -204,17 +206,23 @@ def train_network(x1, x2):
         if sys.argv[1] == 'train':
             print("Beginning the training of the model...\n\n")
 
-            for epoch in range(numEpochs + 1):
+            for epoch in range(1, numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainBand1) / batchSize)):
+                epoch_x1 = 0
+                epoch_x2 = 0
+                epoch_y = 0
+                for j in range(int(len(trainBand1) / batchSize)+1):
                     epoch_x1 = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_x2 = trainBand2[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
                     _, c = sess.run([optimizer, cost], feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
                     epochLoss += c
-                if epoch % displayStep == 0:
-                    writer.add_summary(sess.run([merged], feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y}), epoch)
-                    print("Epoch ", epoch + 1, ' completed out of ', numEpochs, ' with loss: ', epochLoss)
+                    tf.summary.scalar('Cost', epochLoss)
+                if epoch % displayStep == 0 or epoch == 1:
+                    merged = tf.summary.merge_all()
+                    summary = sess.run(merged, feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
+                    writer.add_summary(summary, epoch)
+                    print("Epoch ", epoch, ' completed out of ', numEpochs, ' with loss: ', epochLoss)
                     save_path = saver.save(sess, modelFn)
                     print("Model saved in file: %s" % save_path)
 
@@ -249,17 +257,21 @@ def train_network(x1, x2):
         elif sys.argv[1] == 'continue':
             print("Loading the model from storage to continue training...\n\n")
             saver.restore(sess, modelFn)
-            for epoch in range(numEpochs + 1):
+            for epoch in range(1, numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainBand1) / batchSize)):
+                epoch_x1 = 0
+                epoch_x2 = 0
+                epoch_y = 0
+                for j in range(int(len(trainBand1) / batchSize)+1):
                     epoch_x1 = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_x2 = trainBand2[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
                     _, c = sess.run([optimizer, cost], feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
                     epochLoss += c
-                if epoch % displayStep == 0:
-                    writer.add_summary(sess.run([merged], feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y}), epoch)
-                    print("Epoch ", epoch + 1, ' completed out of ', numEpochs, ' with loss: ', epochLoss)
+                if epoch % displayStep == 0 or epoch == 1:
+                    summary = sess.run(merged, feed_dict={x1: epoch_x1, x2: epoch_x2, y: epoch_y})
+                    writer.add_summary(summary, epoch)
+                    print("Epoch ", epoch, ' completed out of ', numEpochs, ' with loss: ', epochLoss)
                     save_path = saver.save(sess, modelFn)
                     print("Model saved in file: %s" % save_path)
 
