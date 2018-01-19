@@ -25,10 +25,10 @@ import tensorflow as tf
 
 
 ####### HYPER PARAMS ########
-learningRate = 0.0001
-beta = 0.01
+learningRate = 0.00001
+beta = 0.02
 n_classes = 2
-keepRate = 0.5
+keepRate = 0.6
 batchSize = 10
 numEpochs = 10000
 displayStep = 5
@@ -59,12 +59,12 @@ biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_out': tf.Variable(tf.zeros([n_classes]))}
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/test_single_band2_network.ckpt')
+modelFn = os.path.normpath('models/tensorflow/filtered_single_band2_network.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/test_single_band2_network.log')
+logFn = os.path.normpath('models/tensorflow/logs/filtered_single_band2_network')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
@@ -235,15 +235,18 @@ def train_network(x):
 
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
 try:
-    trainBand1 = pickle.load(open("data/pickle/trainBand1.p", "rb"))
-    trainBand2 = pickle.load(open("data/pickle/trainBand2.p", "rb"))
-    testBand1 = pickle.load(open("data/pickle/testBand1.p", "rb"))
-    testBand2 = pickle.load(open("data/pickle/testBand2.p", "rb"))
+    tempBand = pickle.load(open("data/pickle/trainBand1_flipped.p", "rb"))
+    trainBand2 = pickle.load(open("data/pickle/trainBand2_flipped.p", "rb"))
+    testBand2 = pickle.load(open("data/pickle/testBand2_flipped.p", "rb"))
     trainLabels = pickle.load(open("data/pickle/trainLabels.p", "rb"))
     testLabels = pickle.load(open("data/pickle/testLabels.p", "rb"))
 except:
     print("Problem loading the data from the pickle files... exiting application")
     exit(1)
+
+####### CREATE MORE TRAINING POINTS USING THE OTHER BAND #######
+trainBand2 = np.concatenate((trainBand2, tempBand))
+trainLabels = np.concatenate((trainLabels, trainLabels))
 
 ###### RUN THE SESSION ########
 print("\n\nStarting the TensorFlow session...\n\n")
