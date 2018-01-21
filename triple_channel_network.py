@@ -25,18 +25,18 @@ import tensorflow as tf
 
 
 ####### HYPER PARAMS ########
-learningRate = 0.000001
-beta = 0.02
+learningRate = 0.00001
+beta = 0.01
 n_classes = 2
-keepRate = 0.6
-batchSize = 10
+keepRate = 0.8
+batchSize = 15
 numEpochs = 10000
 displayStep = 5
 
 ####### TENSORFLOW PLACEHOLDERS #######
-x = tf.placeholder('float', [None, 5625])
+x = tf.placeholder('float', [None, 16875])
 y = tf.placeholder('float')
-weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 1, 75], stddev=0.1)),
+weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 75], stddev=0.1)),
                'W_conv2': tf.Variable(tf.truncated_normal([4, 4, 75, 100], stddev=0.1)),
                'W_conv3': tf.Variable(tf.truncated_normal([4, 4, 100, 150], stddev=0.1)),
                'W_conv4': tf.Variable(tf.truncated_normal([4, 4, 150, 100], stddev=0.1)),
@@ -59,17 +59,24 @@ biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_out': tf.Variable(tf.zeros([n_classes]))}
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/flipped_single_band2_network.ckpt')
+modelFn = os.path.normpath('models/tensorflow/triple_channel_network.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/flipped_single_band2_network')
+logFn = os.path.normpath('models/tensorflow/logs/triple_channel_network')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
 
-
+####### UTILITY FUNCTIONS #######
+def getProbs(predictions):
+    probs = predictions
+    for i in range(len(predictions)):
+        temp = predictions[i]
+        temp = np.exp(temp) / np.sum(np.exp(temp), axis=0)
+        probs[i] = temp
+    return probs
 
 def conv2d(x, W, b):
     temp = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME') + b
@@ -80,7 +87,7 @@ def conv2d(x, W, b):
 
 def convolutional_neural_network(x, weights, biases):
     
-    x = tf.reshape(x, shape=[-1, 75, 75, 1])
+    x = tf.reshape(x, shape=[-1, 75, 75, 3])
 
     conv1 = conv2d(x, weights['W_conv1'], biases['b_conv1'])
     conv2 = conv2d(conv1, weights['W_conv2'], biases['b_conv2'])
@@ -97,6 +104,9 @@ def convolutional_neural_network(x, weights, biases):
     fc = tf.nn.dropout(fc, keepRate)
 
     output = tf.matmul(fc, weights['W_out']) + biases['b_out']
+    
+    if(sys.argv[1] == 'test'):
+        return tf.nn.softmax(output)
 
     return output
 
@@ -105,9 +115,8 @@ def train_network(x):
     predictions = convolutional_neural_network(x, weights, biases)
 
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=predictions))
-    
-    regularizer = tf.nn.l2_loss(weights['W_conv1']) + tf.nn.l2_loss(weights['W_conv2']) + tf.nn.l2_loss(weights['W_conv3']) + tf.nn.l2_loss(weights['W_conv4']) + tf.nn.l2_loss(weights['W_conv5']) + tf.nn.l2_loss(weights['W_conv6']) + tf.nn.l2_loss(weights['W_conv7']) + tf.nn.l2_loss(weights['W_conv8']) + tf.nn.l2_loss(weights['W_fc']) + tf.nn.l2_loss(weights['W_out'])
-    cost = tf.reduce_mean(cost + beta * regularizer)
+    # regularizer = tf.nn.l2_loss(weights['W_conv1']) + tf.nn.l2_loss(weights['W_conv2']) + tf.nn.l2_loss(weights['W_conv3']) + tf.nn.l2_loss(weights['W_conv4']) + tf.nn.l2_loss(weights['W_conv5']) + tf.nn.l2_loss(weights['W_conv6']) + tf.nn.l2_loss(weights['W_conv7']) + tf.nn.l2_loss(weights['W_conv8']) + tf.nn.l2_loss(weights['W_fc']) + tf.nn.l2_loss(weights['W_out'])
+    # cost = tf.reduce_mean(cost + beta * regularizer)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learningRate).minimize(cost)
 
@@ -124,11 +133,11 @@ def train_network(x):
 
         if sys.argv[1] == 'train':
             print("Beginning the training of the model...\n\n")
-            keepRate = 0.8
+            keepRate = 0.5
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainBand2) / batchSize)):
-                    epoch_x = trainBand2[j*batchSize:(j+1)*batchSize]
+                for j in range(int(len(trainBand1) / batchSize)):
+                    epoch_x = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
                     _, c = sess.run([optimizer, cost], feed_dict={x: epoch_x, y: epoch_y})
                     epochLoss += c
@@ -141,36 +150,15 @@ def train_network(x):
             save_path = saver.save(sess, modelFn)
             print("Model saved in file: %s" % save_path)
 
-            tempEval = []
-            keepRate = 1.0
-            for j in range(int(len(testBand2) / batchSize)+1):
-                batch_x = testBand2[j*batchSize:(j+1)*batchSize]
-                predOut = predictions.eval(feed_dict={x: batch_x})
-                if j == 0:
-                    tempEval = predOut
-                else:
-                    tempEval = np.concatenate((tempEval, predOut))
-            predOut = np.argmax(tempEval, axis=1)
-            tempLabels = np.argmax(testLabels, axis=1)
-            tn, fp, fn, tp = skm.confusion_matrix(tempLabels, predOut).ravel()
-            print("\n\nConfusion Matrix:\n", skm.confusion_matrix(tempLabels, predOut), "\n\n")
-            print("True Negative: ", tn)
-            print("False Negative: ", fn)
-            print("False Positive: ", fp)
-            print("True Positive: ", tp)
-            print("Accuracy: ", skm.accuracy_score(tempLabels, predOut), "%\n")
-            print("Precision: ", skm.precision_score(tempLabels, predOut))
-            print("Recall: ", skm.recall_score(tempLabels, predOut))
-            print("F1 Score: ", skm.f1_score(tempLabels, predOut))
         ####### Continue Training from a saved model #######
         elif sys.argv[1] == 'continue':
             print("Loading the model from storage to continue training...\n\n")
             saver.restore(sess, modelFn)
-            keepRate = 0.8
+            keepRate = 0.5
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
-                for j in range(int(len(trainBand2) / batchSize)):
-                    epoch_x = trainBand2[j*batchSize:(j+1)*batchSize]
+                for j in range(int(len(trainBand1) / batchSize)):
+                    epoch_x = trainBand1[j*batchSize:(j+1)*batchSize]
                     epoch_y = trainLabels[j*batchSize:(j+1)*batchSize]
                     _, c = sess.run([optimizer, cost], feed_dict={x: epoch_x, y: epoch_y})
                     epochLoss += c
@@ -183,41 +171,25 @@ def train_network(x):
             save_path = saver.save(sess, modelFn)
             print("Model saved in file: %s" % save_path)
 
-            keepRate = 1.0
-            tempEval = []
-            for j in range(int(len(testBand2) / batchSize)+1):
-                batch_x = testBand2[j*batchSize:(j+1)*batchSize]
-                predOut = predictions.eval(feed_dict={x: batch_x})
-                if j == 0:
-                    tempEval = predOut
-                else:
-                    tempEval = np.concatenate((tempEval, predOut))
-            predOut = np.argmax(tempEval, axis=1)
-            tempLabels = np.argmax(testLabels, axis=1)
-            tn, fp, fn, tp = skm.confusion_matrix(tempLabels, predOut).ravel()
-            print("\n\nConfusion Matrix:\n", skm.confusion_matrix(tempLabels, predOut), "\n\n")
-            print("True Negative: ", tn)
-            print("False Negative: ", fn)
-            print("False Positive: ", fp)
-            print("True Positive: ", tp)
-            print("Accuracy: ", skm.accuracy_score(tempLabels, predOut), "%\n")
-            print("Precision: ", skm.precision_score(tempLabels, predOut))
-            print("Recall: ", skm.recall_score(tempLabels, predOut))
-            print("F1 Score: ", skm.f1_score(tempLabels, predOut))
         ####### Run only the test data throught the model #######
         else:
             print("Loading the model from storage...\n\n")
             saver.restore(sess, modelFn)
             keepRate = 1.0
             tempEval = []
-            for j in range(int(len(testBand2) / batchSize)+1):
-                batch_x = testBand2[j*batchSize:(j+1)*batchSize]
+            for j in range(int(len(testBand1) / batchSize)+1):
+                batch_x = testBand1[j*batchSize:(j+1)*batchSize]
                 predOut = predictions.eval(feed_dict={x: batch_x})
                 if j == 0:
                     tempEval = predOut
                 else:
                     tempEval = np.concatenate((tempEval, predOut))
             predOut = np.argmax(tempEval, axis=1)
+            probs = tempEval[:,1]
+            lowThresh = 0.15
+            highThresh = 0.85
+            probs[probs < lowThresh] = lowThresh
+            probs[probs > highThresh] = highThresh
             tempLabels = np.argmax(testLabels, axis=1)
             tn, fp, fn, tp = skm.confusion_matrix(tempLabels, predOut).ravel()
             print("\n\nConfusion Matrix:\n", skm.confusion_matrix(tempLabels, predOut), "\n\n")
@@ -229,24 +201,25 @@ def train_network(x):
             print("Precision: ", skm.precision_score(tempLabels, predOut))
             print("Recall: ", skm.recall_score(tempLabels, predOut))
             print("F1 Score: ", skm.f1_score(tempLabels, predOut))
+            print("Log Loss: ", skm.log_loss(tempLabels, probs, eps=1e-15), "\n\n")
+            
 
         save_path = saver.save(sess, modelFn)
         print("Model saved in file %s" % save_path)
 
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
 try:
-    tempBand = pickle.load(open("data/pickle/trainBand1_flipped.p", "rb"))
-    trainBand2 = pickle.load(open("data/pickle/trainBand2_flipped.p", "rb"))
-    testBand2 = pickle.load(open("data/pickle/testBand2_flipped.p", "rb"))
-    trainLabels = pickle.load(open("data/pickle/trainLabels.p", "rb"))
+    print("Loading the training images...")
+    trainBand1 = pickle.load(open("data/pickle/trainTripleImg.p", "rb"))
+    print("Loading the test imgages...")
+    testBand1 = pickle.load(open("data/pickle/testTriple.p", "rb"))
+    print("Loading the training labels...")
+    trainLabels = pickle.load(open("data/pickle/trainTripleLabels.p", "rb"))
+    print("Loading the test labels...")
     testLabels = pickle.load(open("data/pickle/testLabels.p", "rb"))
 except:
     print("Problem loading the data from the pickle files... exiting application")
     exit(1)
-
-####### CREATE MORE TRAINING POINTS USING THE OTHER BAND #######
-trainBand2 = np.concatenate((trainBand2, tempBand))
-trainLabels = np.concatenate((trainLabels, trainLabels))
 
 ###### RUN THE SESSION ########
 print("\n\nStarting the TensorFlow session...\n\n")
