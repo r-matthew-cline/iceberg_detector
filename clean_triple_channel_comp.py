@@ -28,11 +28,9 @@ import tensorflow as tf
 ####### HYPER PARAMS ########
 n_classes = 2
 keepRate = 1.0
-batchSize = 10
+batchSize = 32
 
 ####### TENSORFLOW PLACEHOLDERS #######
-x = tf.placeholder('float', [None, 16875])
-y = tf.placeholder('float')
 x = tf.placeholder('float', [None, 16875])
 y = tf.placeholder('float')
 weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 75], stddev=0.1)),
@@ -46,7 +44,10 @@ weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 75], stddev=0.1)
                'W_fc': tf.Variable(tf.truncated_normal([75 * 75 * 10, 1024], stddev=0.1)),
                'W_fc2': tf.Variable(tf.truncated_normal([1024, 1024], stddev=0.1)),
                'W_fc3': tf.Variable(tf.truncated_normal([1024, 1024], stddev=0.1)),
-               'W_out': tf.Variable(tf.truncated_normal([1024, n_classes], stddev=0.1))}
+               'W_fc4': tf.Variable(tf.truncated_normal([1024, 512], stddev=0.1)),
+               'W_fc5': tf.Variable(tf.truncated_normal([512, 256], stddev=0.1)),
+               'W_fc6': tf.Variable(tf.truncated_normal([256, 32], stddev=0.1)),
+               'W_out': tf.Variable(tf.truncated_normal([32, n_classes], stddev=0.1))}
 
 biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_conv2': tf.Variable(tf.zeros([100])),
@@ -59,24 +60,27 @@ biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_fc': tf.Variable(tf.zeros([1024])),
               'b_fc2': tf.Variable(tf.zeros([1024])),
               'b_fc3': tf.Variable(tf.zeros([1024])),
+              'b_fc4': tf.Variable(tf.zeros([512])),
+              'b_fc5': tf.Variable(tf.zeros([256])),
+              'b_fc6': tf.Variable(tf.zeros([32])),
               'b_out': tf.Variable(tf.zeros([n_classes]))}
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/clean_triple_channel_network2.ckpt')
+modelFn = os.path.normpath('models/tensorflow/clean_triple_channel_network3.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/clean_triple_channel_network2')
+logFn = os.path.normpath('models/tensorflow/logs/clean_triple_channel_network3')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
 ####### SET UP OUTPUT DIRECTORY #######
 now = datetime.datetime.now()
 name = str(now.year) + str(now.month) + str(now.day) + str(now.hour) + str(now.minute) + ".csv"
-outputFn = os.path.normpath('output/triple_channel/' + name)
-if not os.path.exists(os.path.normpath('output/triple_channel')):
-    os.makedirs('output/triple_channel')
+outputFn = os.path.normpath('output/clean_triple_channel/' + name)
+if not os.path.exists(os.path.normpath('output/clean_triple_channel')):
+    os.makedirs('output/clean_triple_channel')
 
 ######## UTILITY FUNCTIONS ########
 
@@ -87,7 +91,7 @@ def conv2d(x, W, b):
     return temp
 
 def convolutional_neural_network(x, weights, biases):
-    
+
     x = tf.reshape(x, shape=[-1, 75, 75, 3])
 
     conv1 = conv2d(x, weights['W_conv1'], biases['b_conv1'])
@@ -110,12 +114,21 @@ def convolutional_neural_network(x, weights, biases):
     fc3 = tf.nn.leaky_relu(tf.matmul(fc2, weights['W_fc3']) + biases['b_fc3'])
     fc3 = tf.nn.dropout(fc3, keepRate)
 
-    output = tf.matmul(fc, weights['W_out']) + biases['b_out']
-    
-    if(sys.argv[1] == 'test'):
-        return tf.nn.softmax(output)
+    fc4 = tf.nn.leaky_relu(tf.matmul(fc3, weights['W_fc4']) + biases['b_fc4'])
+    fc4 = tf.nn.dropout(fc4, keepRate)
+
+    fc5 = tf.nn.leaky_relu(tf.matmul(fc4, weights['W_fc5']) + biases['b_fc5'])
+    fc5 = tf.nn.dropout(fc5, keepRate)
+
+    fc6 = tf.nn.leaky_relu(tf.matmul(fc5, weights['W_fc6']) + biases['b_fc6'])
+    fc6 = tf.nn.dropout(fc6, keepRate)
+
+    output = tf.matmul(fc6, weights['W_out']) + biases['b_out']
+
+    output = tf.nn.softmax(output)
 
     return output
+
 
 def train_network(x):
     predictions = convolutional_neural_network(x, weights, biases)
@@ -138,8 +151,8 @@ def train_network(x):
             else:
                 tempEval = np.concatenate((tempEval, predOut))
         tempEval = tempEval[:,1]
-        highThresh = 0.85
-        lowThresh = 0.15
+        highThresh = 0.9
+        lowThresh = 0.1
         tempEval[tempEval > highThresh] = highThresh
         tempEval[tempEval < lowThresh] = lowThresh
         d = {'id': compId, 'is_iceberg': tempEval}
@@ -150,15 +163,16 @@ def train_network(x):
         print("\n\nPrinting the results to csv file...\n\n")
         df.to_csv(outputFn, index=False)
 
-        plt.figure()
-        plt.hist(df['is_iceberg'])
-        plt.show()
+        if sys.argv[1] == 'hist':
+          plt.figure()
+          plt.hist(df['is_iceberg'])
+          plt.show()
 
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
 print("Reading in the test data from pickle files...\n\n")
 try:
     compId = pickle.load(open("data/pickle/compId.p", "rb"))
-    compBand1 = pickle.load(open("data/pickle/compTriple.p", "rb"))
+    compBand1 = pickle.load(open("data/pickle/cleanTripleComp.p", "rb"))
 except:
     print("Problem loading the data from the pickle files... exiting application")
     exit(1)

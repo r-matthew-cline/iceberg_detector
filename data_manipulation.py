@@ -176,6 +176,14 @@ for i in range(len(compBand1)):
 compBand1 = reorgImgs(compBand1)
 compBand2 = reorgImgs(compBand2)
 
+####### CREATE A TRIPLE CHANNEL IMAGE BEFORE SCALING #######
+cleanTripleTrain = combineBands2(trainBand1, trainBand2)
+cleanTripleTest = combineBands2(testBand1, testBand2)
+cleanTripleComp = combineBands2(compBand1, compBand2)
+
+####### SUPERSAMPLE THE CLEAN TRIPLE IMAGES FOR TRAINIGN #######
+cleanTripleTrain, cleanTripleTrainLabels = superSampleTraining(cleanTripleTrain, trainLabels)
+
 ####### STANDARDIZE THE IMAGE DATA ####### 
 print("Standardizing the features...\n\n")
 trainBand1 = standardizeFeatures(trainBand1)
@@ -274,3 +282,8 @@ pickle.dump(trainTripleImg, open(dataDirectory + "/trainTripleImg.p", "wb"))
 pickle.dump(testTriple, open(dataDirectory + "/testTriple.p", "wb"))
 pickle.dump(compTriple, open(dataDirectory + "/compTriple.p", "wb"))
 pickle.dump(trainTripleLabels, open(dataDirectory + "/trainTripleLabels.p", "wb"))
+
+pickle.dump(cleanTripleTrain, open(dataDirectory + "/cleanTripleTrain.p", "wb"))
+pickle.dump(cleanTripleTest, open(dataDirectory + "/cleanTripleTest.p", "wb"))
+pickle.dump(cleanTripleComp, open(dataDirectory + "/cleanTripleComp.p", "wb"))
+pickle.dump(cleanTripleTrainLabels, open(dataDirectory + "cleanTripleTrainLabels.p", "wb"))

@@ -25,11 +25,13 @@ import tensorflow as tf
 
 
 ####### HYPER PARAMS ########
-learningRate = 0.000000001
+learningRate = 0.00001
 beta = 0.01
 n_classes = 2
-keepRate = 0.8
-batchSize = 20
+keepRate = 0.95
+if sys.argv[1] == 'test':
+    keepRate = 1.0
+batchSize = 48
 numEpochs = 10000
 displayStep = 5
 
@@ -45,7 +47,12 @@ weights = {'W_conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 75], stddev=0.1)
                'W_conv7': tf.Variable(tf.truncated_normal([3, 3, 50, 25], stddev=0.1)),
                'W_conv8': tf.Variable(tf.truncated_normal([3, 3, 25, 10], stddev=0.1)),
                'W_fc': tf.Variable(tf.truncated_normal([75 * 75 * 10, 1024], stddev=0.1)),
-               'W_out': tf.Variable(tf.truncated_normal([1024, n_classes], stddev=0.1))}
+               'W_fc2': tf.Variable(tf.truncated_normal([1024, 1024], stddev=0.1)),
+               'W_fc3': tf.Variable(tf.truncated_normal([1024, 1024], stddev=0.1)),
+               'W_fc4': tf.Variable(tf.truncated_normal([1024, 512], stddev=0.1)),
+               'W_fc5': tf.Variable(tf.truncated_normal([512, 256], stddev=0.1)),
+               'W_fc6': tf.Variable(tf.truncated_normal([256, 32], stddev=0.1)),
+               'W_out': tf.Variable(tf.truncated_normal([32, n_classes], stddev=0.1))}
 
 biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_conv2': tf.Variable(tf.zeros([100])),
@@ -56,15 +63,20 @@ biases = {'b_conv1': tf.Variable(tf.zeros([75])),
               'b_conv7': tf.Variable(tf.zeros([25])),
               'b_conv8': tf.Variable(tf.zeros([10])),
               'b_fc': tf.Variable(tf.zeros([1024])),
+              'b_fc2': tf.Variable(tf.zeros([1024])),
+              'b_fc3': tf.Variable(tf.zeros([1024])),
+              'b_fc4': tf.Variable(tf.zeros([512])),
+              'b_fc5': tf.Variable(tf.zeros([256])),
+              'b_fc6': tf.Variable(tf.zeros([32])),
               'b_out': tf.Variable(tf.zeros([n_classes]))}
 
 ######## PLACE TO SAVE THE MODEL AFTER TRAINING ########
-modelFn = os.path.normpath('models/tensorflow/triple_channel_network.ckpt')
+modelFn = os.path.normpath('models/tensorflow/clean_triple_channel_network3.ckpt')
 if not os.path.exists(os.path.normpath('models/tensorflow')):
     os.makedirs('models/tensorflow')
 
 ####### SET UP LOGGING DIRECTORY FOR TENSORBOARD #######
-logFn = os.path.normpath('models/tensorflow/logs/triple_channel_network')
+logFn = os.path.normpath('models/tensorflow/logs/clean_triple_channel_network3')
 if not os.path.exists(os.path.normpath('models/tensorflow/logs')):
     os.makedirs('models/tensorflow/logs')
 
@@ -103,7 +115,22 @@ def convolutional_neural_network(x, weights, biases):
     fc = tf.nn.leaky_relu(tf.matmul(fc, weights['W_fc']) + biases['b_fc'])
     fc = tf.nn.dropout(fc, keepRate)
 
-    output = tf.matmul(fc, weights['W_out']) + biases['b_out']
+    fc2 = tf.nn.leaky_relu(tf.matmul(fc, weights['W_fc2']) + biases['b_fc2'])
+    fc2 = tf.nn.dropout(fc2, keepRate)
+
+    fc3 = tf.nn.leaky_relu(tf.matmul(fc2, weights['W_fc3']) + biases['b_fc3'])
+    fc3 = tf.nn.dropout(fc3, keepRate)
+
+    fc4 = tf.nn.leaky_relu(tf.matmul(fc3, weights['W_fc4']) + biases['b_fc4'])
+    fc4 = tf.nn.dropout(fc4, keepRate)
+
+    fc5 = tf.nn.leaky_relu(tf.matmul(fc4, weights['W_fc5']) + biases['b_fc5'])
+    fc5 = tf.nn.dropout(fc5, keepRate)
+
+    fc6 = tf.nn.leaky_relu(tf.matmul(fc5, weights['W_fc6']) + biases['b_fc6'])
+    fc6 = tf.nn.dropout(fc6, keepRate)
+
+    output = tf.matmul(fc6, weights['W_out']) + biases['b_out']
     
     if(sys.argv[1] == 'test'):
         return tf.nn.softmax(output)
@@ -133,7 +160,6 @@ def train_network(x):
 
         if sys.argv[1] == 'train':
             print("Beginning the training of the model...\n\n")
-            keepRate = 0.5
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
                 for j in range(int(len(trainBand1) / batchSize)):
@@ -154,7 +180,6 @@ def train_network(x):
         elif sys.argv[1] == 'continue':
             print("Loading the model from storage to continue training...\n\n")
             saver.restore(sess, modelFn)
-            keepRate = 0.5
             for epoch in range(numEpochs + 1):
                 epochLoss = 0
                 for j in range(int(len(trainBand1) / batchSize)):
@@ -175,7 +200,6 @@ def train_network(x):
         else:
             print("Loading the model from storage...\n\n")
             saver.restore(sess, modelFn)
-            keepRate = 1.0
             tempEval = []
             for j in range(int(len(testBand1) / batchSize)+1):
                 batch_x = testBand1[j*batchSize:(j+1)*batchSize]
@@ -186,10 +210,15 @@ def train_network(x):
                     tempEval = np.concatenate((tempEval, predOut))
             predOut = np.argmax(tempEval, axis=1)
             probs = tempEval[:,1]
-            lowThresh = 0.15
-            highThresh = 0.85
+            lowThresh = 0.08
+            highThresh = 0.92
             probs[probs < lowThresh] = lowThresh
             probs[probs > highThresh] = highThresh
+            if len(sys.argv) > 2:
+                if sys.argv[2] == 'hist':
+                    plt.figure()
+                    plt.hist(probs)
+                    plt.show()
             tempLabels = np.argmax(testLabels, axis=1)
             tn, fp, fn, tp = skm.confusion_matrix(tempLabels, predOut).ravel()
             print("\n\nConfusion Matrix:\n", skm.confusion_matrix(tempLabels, predOut), "\n\n")
@@ -210,11 +239,11 @@ def train_network(x):
 ####### LOAD THE PREPARED DATA FROM THE PICKLE FILES #######
 try:
     print("Loading the training images...")
-    trainBand1 = pickle.load(open("data/pickle/trainTripleImg.p", "rb"))
+    trainBand1 = pickle.load(open("data/pickle/cleanTripleTrain.p", "rb"))
     print("Loading the test imgages...")
-    testBand1 = pickle.load(open("data/pickle/testTriple.p", "rb"))
+    testBand1 = pickle.load(open("data/pickle/cleanTripleTest.p", "rb"))
     print("Loading the training labels...")
-    trainLabels = pickle.load(open("data/pickle/trainTripleLabels.p", "rb"))
+    trainLabels = pickle.load(open("data/picklecleanTripleTrainLabels.p", "rb"))
     print("Loading the test labels...")
     testLabels = pickle.load(open("data/pickle/testLabels.p", "rb"))
 except:
